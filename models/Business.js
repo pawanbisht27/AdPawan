@@ -56,6 +56,17 @@ const businessSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    gstNumber: {
+  type: String,
+  default: "",
+  trim: true,
+},
+
+billingEmail: {
+  type: String,
+  default: "",
+  trim: true,
+},
 
     currentPlan: {
       type: String,
@@ -99,6 +110,49 @@ description: {
   type: String,
   default: "",
   trim: true,
+},
+defaultCampaignBudget: {
+  type: Number,
+  default: 500,
+},
+
+autoPauseLowPerformance: {
+  type: Boolean,
+  default: false,
+},
+
+performanceGoal: {
+  type: String,
+  default: "Leads",
+},
+campaignAlerts: {
+  type: Boolean,
+  default: true,
+},
+
+leadAlerts: {
+  type: Boolean,
+  default: true,
+},
+
+paymentAlerts: {
+  type: Boolean,
+  default: false,
+},
+
+promotionalUpdates: {
+  type: Boolean,
+  default: false,
+},
+
+weeklyReports: {
+  type: Boolean,
+  default: true,
+},
+
+fcmToken: {
+  type: String,
+  default: "",
 },
     
   },

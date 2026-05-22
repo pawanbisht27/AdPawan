@@ -6,6 +6,8 @@ const Payment = require("../models/Payment");
 const Campaign = require("../models/Campaign");
 const Business = require("../models/Business");
 
+const admin = require("../config/firebase"); // 👈 add this
+
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
@@ -22,13 +24,17 @@ exports.createPaymentOrder = async (req, res) => {
     }
 
     if (!mongoose.Types.ObjectId.isValid(campaignId)) {
-      return res.status(400).json({ message: "Invalid campaignId" });
+      return res.status(400).json({
+        message: "Invalid campaignId",
+      });
     }
 
     const parsedAmount = Number(amount);
 
     if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      return res.status(400).json({ message: "Valid amount is required" });
+      return res.status(400).json({
+        message: "Valid amount is required",
+      });
     }
 
     const campaign = await Campaign.findOne({
@@ -37,7 +43,9 @@ exports.createPaymentOrder = async (req, res) => {
     });
 
     if (!campaign) {
-      return res.status(404).json({ message: "Campaign not found" });
+      return res.status(404).json({
+        message: "Campaign not found",
+      });
     }
 
     const business = await Business.findOne({
@@ -46,11 +54,13 @@ exports.createPaymentOrder = async (req, res) => {
     });
 
     if (!business) {
-      return res.status(404).json({ message: "Business not found" });
+      return res.status(404).json({
+        message: "Business not found",
+      });
     }
 
     const razorpayOrder = await razorpay.orders.create({
-      amount: Math.round(parsedAmount * 100), // paise
+      amount: Math.round(parsedAmount * 100),
       currency: "INR",
       receipt: `rcpt_${Date.now()}`,
       notes: {
@@ -72,6 +82,21 @@ exports.createPaymentOrder = async (req, res) => {
     campaign.status = "payment_pending";
     await campaign.save();
 
+    // 🔔 payment pending notification
+    if (
+      business?.fcmToken &&
+      business?.paymentAlerts
+    ) {
+      await admin.messaging().send({
+        token: business.fcmToken,
+
+        notification: {
+          title: "Payment Started",
+          body: `Payment process started for ${campaign.name}`,
+        },
+      });
+    }
+
     return res.status(201).json({
       message: "Payment order created",
       payment,
@@ -80,7 +105,10 @@ exports.createPaymentOrder = async (req, res) => {
     });
   } catch (error) {
     console.error("CREATE PAYMENT ORDER ERROR:", error);
-    return res.status(500).json({ error: error.message });
+
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 };
 
@@ -110,14 +138,22 @@ exports.verifyPayment = async (req, res) => {
     });
 
     if (!payment) {
-      return res.status(404).json({ message: "Payment not found" });
+      return res.status(404).json({
+        message: "Payment not found",
+      });
     }
 
     const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .createHmac(
+        "sha256",
+        process.env.RAZORPAY_KEY_SECRET
+      )
+      .update(
+        `${razorpay_order_id}|${razorpay_payment_id}`
+      )
       .digest("hex");
 
+    // ❌ invalid payment
     if (expectedSignature !== razorpay_signature) {
       payment.paymentStatus = "failed";
       await payment.save();
@@ -132,12 +168,31 @@ exports.verifyPayment = async (req, res) => {
         await failedCampaign.save();
       }
 
-      return res.status(400).json({ message: "Invalid payment signature" });
+      // 🔔 failed notification
+      if (
+        business?.fcmToken &&
+        business?.paymentAlerts
+      ) {
+        await admin.messaging().send({
+          token: business.fcmToken,
+
+          notification: {
+            title: "Payment Failed",
+            body: "Your payment verification failed",
+          },
+        });
+      }
+
+      return res.status(400).json({
+        message: "Invalid payment signature",
+      });
     }
 
+    // ✅ payment success
     payment.paymentStatus = "paid";
     payment.transactionId = razorpay_payment_id;
     payment.paidAt = new Date();
+
     await payment.save();
 
     const campaign = await Campaign.findOne({
@@ -150,6 +205,27 @@ exports.verifyPayment = async (req, res) => {
       await campaign.save();
     }
 
+    // 🔔 success notification
+    const business = await Business.findOne({
+      _id: payment.business,
+      user: req.user,
+    });
+
+    if (
+      business?.fcmToken &&
+      business?.paymentAlerts
+    ) {
+      await admin.messaging().send({
+        token: business.fcmToken,
+
+        notification: {
+          title: "Payment Successful",
+          body:
+            "Your payment was completed successfully",
+        },
+      });
+    }
+
     return res.json({
       message: "Payment verified successfully",
       payment,
@@ -157,20 +233,34 @@ exports.verifyPayment = async (req, res) => {
     });
   } catch (error) {
     console.error("VERIFY PAYMENT ERROR:", error);
-    return res.status(500).json({ error: error.message });
+
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 };
 
 exports.getMyPayments = async (req, res) => {
   try {
-    const payments = await Payment.find({ user: req.user })
-      .populate("campaign", "name status totalBudget")
-      .populate("business", "businessName category")
+    const payments = await Payment.find({
+      user: req.user,
+    })
+      .populate(
+        "campaign",
+        "name status totalBudget"
+      )
+      .populate(
+        "business",
+        "businessName category"
+      )
       .sort({ createdAt: -1 });
 
     return res.status(200).json(payments);
   } catch (error) {
     console.error("GET PAYMENTS ERROR:", error);
-    return res.status(500).json({ error: error.message });
+
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 };

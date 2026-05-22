@@ -18,6 +18,22 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    signupOtp: {
+      type: String,
+      default: null,
+    },
+
+    signupOtpExpiry: {
+      type: Date,
+      default: null,
+    },
+
     resetOtp: {
       type: String,
       default: null,
@@ -25,6 +41,11 @@ const userSchema = new mongoose.Schema(
     resetOtpExpiry: {
       type: Date,
       default: null,
+    },
+
+    fcmTokens: {
+      type: [String],
+      default: [],
     },
   },
   { timestamps: true }

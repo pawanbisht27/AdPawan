@@ -3,6 +3,7 @@ const Lead = require("../models/Lead");
 const Business = require("../models/Business");
 const Campaign = require("../models/Campaign");
 const Ad = require("../models/Ad");
+const admin = require("../config/firebase");
 
 exports.createLead = async (req, res) => {
   try {
@@ -19,20 +20,30 @@ exports.createLead = async (req, res) => {
 
     if (!businessId || !campaignId || !name || !phone) {
       return res.status(400).json({
-        message: "businessId, campaignId, name and phone are required",
+        message:
+          "businessId, campaignId, name and phone are required",
       });
     }
 
     if (!mongoose.Types.ObjectId.isValid(businessId)) {
-      return res.status(400).json({ message: "Invalid businessId" });
+      return res
+        .status(400)
+        .json({ message: "Invalid businessId" });
     }
 
     if (!mongoose.Types.ObjectId.isValid(campaignId)) {
-      return res.status(400).json({ message: "Invalid campaignId" });
+      return res
+        .status(400)
+        .json({ message: "Invalid campaignId" });
     }
 
-    if (adId && !mongoose.Types.ObjectId.isValid(adId)) {
-      return res.status(400).json({ message: "Invalid adId" });
+    if (
+      adId &&
+      !mongoose.Types.ObjectId.isValid(adId)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Invalid adId" });
     }
 
     const business = await Business.findOne({
@@ -41,7 +52,10 @@ exports.createLead = async (req, res) => {
     });
 
     if (!business) {
-      return res.status(404).json({ message: "Business not found for this user" });
+      return res.status(404).json({
+        message:
+          "Business not found for this user",
+      });
     }
 
     const campaign = await Campaign.findOne({
@@ -50,12 +64,19 @@ exports.createLead = async (req, res) => {
     });
 
     if (!campaign) {
-      return res.status(404).json({ message: "Campaign not found for this user" });
+      return res.status(404).json({
+        message:
+          "Campaign not found for this user",
+      });
     }
 
-    if (String(campaign.business) !== String(businessId)) {
+    if (
+      String(campaign.business) !==
+      String(businessId)
+    ) {
       return res.status(400).json({
-        message: "Campaign does not belong to this business",
+        message:
+          "Campaign does not belong to this business",
       });
     }
 
@@ -66,7 +87,10 @@ exports.createLead = async (req, res) => {
       });
 
       if (!ad) {
-        return res.status(404).json({ message: "Ad not found for this user" });
+        return res.status(404).json({
+          message:
+            "Ad not found for this user",
+        });
       }
     }
 
@@ -82,32 +106,92 @@ exports.createLead = async (req, res) => {
       notes: notes?.trim() || "",
     });
 
+    // =========================
+    // SEND PUSH NOTIFICATION
+    // =========================
+
+    if (
+      business.fcmToken &&
+      business.leadAlerts !== false
+    ) {
+      try {
+        await admin.messaging().send({
+          token: business.fcmToken,
+
+          notification: {
+            title: "New Lead Received",
+            body:
+              "${name.trim()} submitted a new lead",
+          },
+
+          data: {
+            type: "lead",
+            leadId: String(lead._id),
+            campaignId: String(campaignId),
+            businessId: String(businessId),
+          },
+        });
+
+        console.log(
+          "Lead notification sent"
+        );
+      } catch (err) {
+        console.log(
+          "FCM SEND ERROR:",
+          err.message
+        );
+      }
+    }
+
     return res.status(201).json({
       message: "Lead created successfully",
       lead,
     });
   } catch (error) {
-    console.error("CREATE LEAD ERROR:", error);
-    return res.status(500).json({ error: error.message });
+    console.error(
+      "CREATE LEAD ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 };
 
 exports.getMyLeads = async (req, res) => {
   try {
-    const leads = await Lead.find({ user: req.user })
-      .populate("business", "businessName category")
-      .populate("campaign", "name status")
+    const leads = await Lead.find({
+      user: req.user,
+    })
+      .populate(
+        "business",
+        "businessName category"
+      )
+      .populate(
+        "campaign",
+        "name status"
+      )
       .populate("ad", "title")
       .sort({ createdAt: -1 });
 
     return res.status(200).json(leads);
   } catch (error) {
-    console.error("GET LEADS ERROR:", error);
-    return res.status(500).json({ error: error.message });
+    console.error(
+      "GET LEADS ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 };
 
-exports.getLeadsByCampaign = async (req, res) => {
+exports.getLeadsByCampaign = async (
+  req,
+  res
+) => {
   try {
     const leads = await Lead.find({
       user: req.user,
@@ -119,166 +203,94 @@ exports.getLeadsByCampaign = async (req, res) => {
 
     return res.status(200).json(leads);
   } catch (error) {
-    console.error("GET LEADS BY CAMPAIGN ERROR:", error);
-    return res.status(500).json({ error: error.message });
+    console.error(
+      "GET LEADS BY CAMPAIGN ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 };
 
-exports.updateLeadStatus = async (req, res) => {
+exports.updateLeadStatus = async (
+  req,
+  res
+) => {
   try {
     const { status, notes } = req.body;
 
     const updateData = {};
-    if (status) updateData.status = status;
-    if (notes !== undefined) updateData.notes = notes;
 
-    const lead = await Lead.findOneAndUpdate(
-      { _id: req.params.id, user: req.user },
-      updateData,
-      { new: true }
-    );
+    if (status)
+      updateData.status = status;
+
+    if (notes !== undefined)
+      updateData.notes = notes;
+
+    const lead =
+      await Lead.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          user: req.user,
+        },
+        updateData,
+        { new: true }
+      );
 
     if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
+      return res.status(404).json({
+        message: "Lead not found",
+      });
     }
 
     return res.json({
-      message: "Lead updated successfully",
+      message:
+        "Lead updated successfully",
       lead,
     });
   } catch (error) {
-    console.error("UPDATE LEAD ERROR:", error);
-    return res.status(500).json({ error: error.message });
+    console.error(
+      "UPDATE LEAD ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 };
 
-exports.deleteLead = async (req, res) => {
+exports.deleteLead = async (
+  req,
+  res
+) => {
   try {
-    const lead = await Lead.findOneAndDelete({
-      _id: req.params.id,
-      user: req.user,
-    });
+    const lead =
+      await Lead.findOneAndDelete({
+        _id: req.params.id,
+        user: req.user,
+      });
 
     if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
+      return res.status(404).json({
+        message: "Lead not found",
+      });
     }
 
-    return res.json({ message: "Lead deleted successfully" });
+    return res.json({
+      message:
+        "Lead deleted successfully",
+    });
   } catch (error) {
-    console.error("DELETE LEAD ERROR:", error);
-    return res.status(500).json({ error: error.message });
+    console.error(
+      "DELETE LEAD ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 };
-
-const createDemoLeadsForCampaign = async ({
-  userId,
-  businessId,
-  campaignId,
-  campaignName,
-}) => {
-  const lowerName = (campaignName || "").toLowerCase();
-
-  let demoLeads = [];
-
-  if (lowerName.includes("whatsapp")) {
-    demoLeads = [
-      {
-        name: "Rahul Sharma",
-        phone: "919876543210",
-        source: "WhatsApp",
-        status: "new",
-        notes: "Interested in product details",
-      },
-      {
-        name: "Priya Verma",
-        phone: "919812345678",
-        source: "WhatsApp",
-        status: "interested",
-        notes: "Asked price on WhatsApp",
-      },
-    ];
-  } else if (lowerName.includes("call")) {
-    demoLeads = [
-      {
-        name: "Aman Joshi",
-        phone: "919900112233",
-        source: "Call",
-        status: "new",
-        notes: "Requested callback",
-      },
-      {
-        name: "Neha Rawat",
-        phone: "919811223344",
-        source: "Call",
-        status: "visited",
-        notes: "Call completed successfully",
-      },
-    ];
-  } else if (lowerName.includes("website")) {
-    demoLeads = [
-      {
-        name: "Sanya Kapoor",
-        phone: "919955667788",
-        source: "Website",
-        status: "new",
-        notes: "Submitted website inquiry form",
-      },
-      {
-        name: "Karan Singh",
-        phone: "919844556677",
-        source: "Website",
-        status: "pending",
-        notes: "Requested more details from landing page",
-      },
-    ];
-  } else if (lowerName.includes("app")) {
-    demoLeads = [
-      {
-        name: "Rohit Mehra",
-        phone: "919877665544",
-        source: "Google",
-        status: "new",
-        notes: "Interested after app install ad",
-      },
-    ];
-  } else {
-    demoLeads = [
-      {
-        name: "Demo Lead 1",
-        phone: "919898101907",
-        source: "Added",
-        status: "new",
-        notes: "Lead generated from Facebook campaign",
-      },
-      {
-        name: "Demo Lead 2",
-        phone: "919898101908",
-        source: "WhatsApp",
-        status: "interested",
-        notes: "Asked for pricing details",
-      },
-      {
-        name: "Demo Lead 3",
-        phone: "919898101909",
-        source: "Sent Offer",
-        status: "visited",
-        notes: "Offer shared with customer",
-      },
-    ];
-  }
-
-  const leadsToInsert = demoLeads.map((lead) => ({
-    user: userId,
-    business: businessId,
-    campaign: campaignId,
-    ad: null,
-    name: lead.name,
-    phone: lead.phone,
-    source: lead.source,
-    status: lead.status,
-    notes: lead.notes,
-  }));
-
-  await Lead.insertMany(leadsToInsert);
-};
-exports.createDemoLeadsForCampaign = createDemoLeadsForCampaign;

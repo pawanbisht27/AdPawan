@@ -11,18 +11,14 @@ exports.getMetaAuthUrl = async (req, res) => {
       });
     }
 
-    const scopes = [
-      "public_profile",
-      "email",
-      "pages_show_list",
-      "pages_read_engagement",
-      "pages_manage_ads",
-      "instagram_basic",
-      "ads_management",
-      "ads_read",
-      "leads_retrieval",
-      "business_management",
-    ].join(",");
+  const scopes = [
+  "email",
+  "pages_show_list",
+  "pages_read_engagement",
+  "ads_read",
+  "ads_management",
+  "business_management"
+].join(",");
 
     const state = req.user.toString();
 
@@ -32,6 +28,8 @@ exports.getMetaAuthUrl = async (req, res) => {
       `&redirect_uri=${encodeURIComponent(process.env.META_REDIRECT_URI)}` +
       `&state=${state}` +
       `&scope=${encodeURIComponent(scopes)}`;
+      console.log("META AUTH URL:", url);
+      console.log("META REDIRECT URI:", process.env.META_REDIRECT_URI);
 
     return res.json({ url });
   } catch (error) {
@@ -41,7 +39,11 @@ exports.getMetaAuthUrl = async (req, res) => {
 };
 
 exports.metaCallback = async (req, res) => {
+   console.log("META CALLBACK HIT ");
+   console.log("QUERY:", req.query);
   try {
+
+    
     const { code, state } = req.query;
 
     if (!code || !state) {
@@ -72,17 +74,20 @@ exports.metaCallback = async (req, res) => {
     const meResponse = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/me?fields=id,name,email&access_token=${accessToken}`
     );
-    const meData = await meResponse.json();
+     const meData = await meResponse.json();
+console.log("ME DATA:", meData);
 
-    const pagesResponse = await fetch(
-      `https://graph.facebook.com/${META_API_VERSION}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&access_token=${accessToken}`
-    );
-    const pagesData = await pagesResponse.json();
+const pagesResponse = await fetch(
+  `https://graph.facebook.com/${META_API_VERSION}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&access_token=${accessToken}`
+);
+const pagesData = await pagesResponse.json();
+console.log("PAGES DATA:", pagesData);
 
-    const adAccountsResponse = await fetch(
-      `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts?fields=id,name,account_status,currency&access_token=${accessToken}`
-    );
-    const adAccountsData = await adAccountsResponse.json();
+const adAccountsResponse = await fetch(
+  `https://graph.facebook.com/${META_API_VERSION}/me/adaccounts?fields=id,name,account_status,currency&access_token=${accessToken}`
+);
+const adAccountsData = await adAccountsResponse.json();
+console.log("AD ACCOUNTS DATA:", adAccountsData);
 
     const business = await Business.findOne({ user: state });
 
