@@ -1,5 +1,5 @@
 require("dotenv").config();
-require("./cron/weeklyReport");
+//require("./cron/weeklyReport");
 
 const express = require("express");
 const cors    = require("cors");
@@ -42,7 +42,7 @@ app.use("/api/meta-ads",         metaAdsRoutes);
 app.use("/api/test",             require("./routes/testRoutes"));
 app.use("/uploads",              express.static("uploads"));
 app.use("/api/google",           googleRoutes);
-app.use("/api/notifications",    require("./routes/notificationRoutes"));
+//app.use("/api/notifications",    require("./routes/notificationRoutes"));
 
 
 // Test route
