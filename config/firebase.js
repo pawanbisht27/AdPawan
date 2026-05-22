@@ -10,4 +10,4 @@ admin.initializeApp({
     ),
 });
 
-module.exports = admin;
+module.exports = null;
